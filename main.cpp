@@ -1,0 +1,382 @@
+
+
+#include <Eigen/Dense>
+#include <map>
+#include <cmath>
+#include <numbers>
+#include <math.h>
+#include <vector>
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+
+#include "Input.h"
+#include "Models.h"
+#include "NumericalIntegrationMethods.h"
+#include "MethodsForEulerAngles.h"
+#include "Utility.h"
+#include "Output.h"
+
+
+Eigen::VectorXd TwelveDofSimulation(double time, Eigen::VectorXd state_vector_at_t, std::map<std::string, double> vehicle_model, std::map<std::string, std::vector<double> > atmosphere_mod)
+{
+	//return vector
+	Eigen::VectorXd dx(12);
+
+	double u = state_vector_at_t[0];
+	double v = state_vector_at_t[1];
+	double w = state_vector_at_t[2];
+	double p = state_vector_at_t[3];
+	double q = state_vector_at_t[4];
+	double r = state_vector_at_t[5];
+	double phi = state_vector_at_t[6];
+	double theta = state_vector_at_t[7];
+	double psi = state_vector_at_t[8];
+	double p10_n = state_vector_at_t[9];
+	double p20_n = state_vector_at_t[10];
+	double p30_n = state_vector_at_t[11];
+
+	//Trig values from Euler angles
+	double c_phi = cos(phi);
+	double c_theta = cos(theta);
+	double c_psi = cos(psi);
+	double s_phi = sin(phi);
+	double s_theta = sin(theta);
+	double s_psi = sin(psi);
+	double t_theta = tan(theta);
+
+
+	//Get mass and moment of inertia from aircraft model
+	double m = vehicle_model["m_kg"];
+	double Jxz_b = vehicle_model["Jxz_b"];
+	double Jxx_b = vehicle_model["Jxx_b"];
+	double Jyy_b = vehicle_model["Jyy_b"];
+	double Jzz_b = vehicle_model["Jzz_b"];
+
+
+	//Get reference dimensions
+	double Aref = vehicle_model["Aref"];
+	double b_m = vehicle_model["b_m"];
+	double c_m = vehicle_model["c_m"];
+
+
+	//get aerodynamic coefficients
+	double Clp = vehicle_model["Clp"];
+	double Clr = vehicle_model["Clr"];
+	double Cmq = vehicle_model["Cmq"];
+	double Cnp = vehicle_model["Cnp"];
+	double Cnr = vehicle_model["Cnr"];
+
+
+	//get current altitude
+	double altitude = -p30_n;
+
+
+	/////////////// Data from US Standard Atmosphere //////////////
+
+	//values for rho
+	//double rho_interp = 1.20;
+	double rho_interp_2 = linearInterpolation(atmosphere_mod["alt_m"], atmosphere_mod["rho_kgpm3"], altitude);
+	//std::cout << "rho interp: " << rho_interp_2 << std::endl;
+	//double rho_interp = 1.225;   //later we will interpolate this
+
+	//values for c_mps
+	double c_interp = linearInterpolation(atmosphere_mod["alt_m"], atmosphere_mod["c_mps"], altitude);
+	//double c_interp = 340.2939; //later we will interpolate this
+
+
+	//Air data calculation(Mach, AoA, AoS)
+	double translation_velocity = sqrt(u * u + v * v + w * w);
+	double qbar = 0.5 * rho_interp_2 * translation_velocity * translation_velocity;
+	double mach_number = translation_velocity / c_interp;
+	double alpha_rad = atan2(w, u);
+	double beta_rad = asin(v / translation_velocity);
+
+
+
+
+	double w_over = 0.0000000001;
+	if (u == 0 && w == 0) {
+		w_over = 0.0;
+	}
+
+	else {
+		w_over = w / u;
+	}
+
+
+	double v_over = 0.000000001;
+	if (translation_velocity == 0 && v == 0) {
+		v_over = 0;
+	}
+	else {
+		v_over = v / translation_velocity;
+	}
+
+
+	double alpha = atan(w_over);
+	double beta = asin(v_over);
+	double s_alpha = sin(alpha);
+	double c_alpha = cos(alpha);
+	double s_beta = sin(beta);
+	double c_beta = cos(beta);
+
+
+	//gravity will act normal to earht tangent CS
+	//double gs_n_mps2 = 9.81;
+	//double gs_n_mps2 = 9.80665;
+	double gs_interp = linearInterpolation(atmosphere_mod["alt_m"], atmosphere_mod["g_mps2"], altitude);
+
+	//we need to transfrom gravity to body coordinate system
+	double gx_b = -sin(theta) * gs_interp;
+	double gy_b = sin(phi) * cos(theta) * gs_interp;
+	double gz_b = cos(phi) * cos(theta) * gs_interp;
+
+
+	//Aerodynamic forces
+	//double drag = vehicle_model["CD_approx"] * qbar * vehicle_model["Aref"];
+	double drag = 0.0;
+	double side = 0.0;
+	double lift = 0.0;
+
+
+	//External forces
+	double Fx_b = -(c_alpha * c_beta * drag - c_alpha * s_beta * side - s_alpha * lift);
+	double Fy_b = -(s_beta * drag + c_beta * side);
+	double Fz_b = -(s_alpha * c_beta * drag - s_alpha * s_beta * side + c_alpha * lift);
+
+	//External moments
+	double l_b = Clp * p * b_m / (2.0 * translation_velocity) + Clr * r * b_m / (2.0 * translation_velocity); //l_b is zero if b_m = 0 or Clp or Clr are 0.
+	double m_b = Cmq * q * c_m / (2.0 * translation_velocity); //m_b is 0 if Cmq or q_b or c_m = 0.
+	double n_b = Cnp * p * b_m / (2.0 * translation_velocity) + Cnr * r * b_m / (2.0 * translation_velocity); //n_b is 0 if Cnp or p_b or b_m = 0.
+
+
+	//Denominator for roll and yaw rate equations
+	double denominator = Jxx_b * Jzz_b - Jxz_b * Jxz_b;
+
+
+	
+	dx[0] = 1 / m * Fx_b + gx_b - w * q + v * r; //x-axis velocity eq
+
+	dx[1] = 1 / m * Fy_b + gy_b - u * r + w * p; //y-axis velocity
+
+	dx[2] = 1 / m * Fz_b + gz_b - v * p + u * q; //z-axis velocity
+
+	//Roll eq
+	dx[3] = (Jxz_b * (Jxx_b - Jyy_b + Jzz_b) * p * q - (Jzz_b * (Jzz_b - Jyy_b) + Jxz_b * Jxz_b) * q * r + Jzz_b * l_b + Jxz_b * n_b) / denominator;
+
+	//Pitch eq
+	dx[4] = ((Jzz_b - Jxx_b) * p * r - Jxz_b * (p * p - r * r) + m_b) / Jyy_b;
+
+	//Yaw eq
+	dx[5] = ((Jxx_b * (Jxx_b - Jyy_b) + Jxz_b * Jxz_b) * p * q - Jxz_b * (Jxx_b - Jyy_b + Jzz_b) * q * r + Jxz_b * l_b + Jxz_b * n_b) / denominator;
+
+	//Kinematic equations
+	dx[6] = p + sin(phi) * tan(theta) * q + cos(phi) * tan(theta) * r;
+	dx[7] = cos(phi) * q - sin(phi) * r;
+	dx[8] = sin(phi) / cos(theta) * q + cos(phi) / cos(theta) * r;
+
+	//Eigen::VectorXd EulerKinEq = EulersKinematicalEq(p, q, r, phi, theta, psi);
+	//dx[6] = EulerKinEq[0];
+	//dx[7] = EulerKinEq[1];
+	//dx[8] = EulerKinEq[2];
+
+
+	//Eigen::VectorXd QuatKinEqs = QuaternionKinematicalEqs(phi, theta, psi, p, q, r);
+	//dx[6] = QuatKinEqs[0];
+	//dx[7] = QuatKinEqs[1];
+	//dx[8] = QuatKinEqs[2];
+
+
+	//Position (Navigation) equations
+	dx[9] = c_theta * c_phi * u +(-c_phi * s_psi + s_phi * s_theta * c_psi) * v +  (s_phi * s_psi + c_phi * s_theta * c_psi) * w;
+	dx[10] = c_phi * s_psi * u + (c_phi * c_psi + s_phi * s_theta * s_psi) * v +  (-s_phi * c_psi + c_phi * s_theta * s_psi) * w;
+	dx[11] =      -s_theta * u +                           s_phi * c_theta * v +                             c_phi * c_theta * w;
+
+	return dx;
+}
+
+Eigen::MatrixXd FourOrderRungeKutta(std::vector<double>& time_vector, Eigen::MatrixXd solution_matrix, std::map<std::string, double>& vehicle_model, double step_size, std::map<std::string, std::vector<double> >& atmosphere_mod)
+{
+	for (int i = 1; i < time_vector.size(); i++)
+	{
+
+		Eigen::VectorXd k1 = step_size * TwelveDofSimulation(time_vector[i - 1], solution_matrix.col(i - 1), vehicle_model, atmosphere_mod);
+		Eigen::VectorXd k2 = step_size * TwelveDofSimulation(time_vector[i - 1] + 0.5 * step_size, solution_matrix.col(i - 1) + 0.5 * k1, vehicle_model, atmosphere_mod);
+		Eigen::VectorXd k3 = step_size * TwelveDofSimulation(time_vector[i - 1] + 0.5 * step_size, solution_matrix.col(i - 1) + 0.5 * k2, vehicle_model, atmosphere_mod);
+		Eigen::VectorXd k4 = step_size * TwelveDofSimulation(time_vector[i - 1] + step_size, solution_matrix.col(i - 1) + k3, vehicle_model, atmosphere_mod);
+
+		Eigen::VectorXd increment = (1.0 / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
+
+		solution_matrix.col(i) = solution_matrix.col(i - 1) + increment;
+
+	}
+	return solution_matrix;
+}
+
+int main() {
+
+	long double pi = 3.141592653589793L;
+
+	///////////////////////////////////////// Initialize variables for simulation ///////////////////////////////////////////////////
+
+	//Simple conversions
+	double radian2degrees = 180 / pi;
+	double degrees2radians = 1 / radian2degrees;
+
+	//// Initial conditions - expressed in the body frame - Euler angles in radians ////
+	double u = 0.0000000001;
+	double v = 0.0;
+	double w = 0.0;
+	double p = 0*degrees2radians;
+	double q = 0 * degrees2radians;
+	double r = 0 * degrees2radians;
+	double phi = 0 * pi / 180.0;
+	double theta = -180*degrees2radians;
+	double psi = 0 * degrees2radians;
+	double p10_n_m = 0;
+	double p20_n_m = 0;
+	double p30_n_m = -30000/3.28;
+	Eigen::VectorXd initial_vector{ {u, v,w, p,q,r, phi,theta,psi,p10_n_m,p20_n_m,p30_n_m} };
+
+
+	//// Time conditions ////
+	double t_0 = 0.0;
+	double tf_s = 30;
+	double step = 0.01;
+
+	std::vector<double> time_step_vector = generate_arange(t_0, tf_s + step, step); //Vector of points at which solution is approximated
+	Eigen::MatrixXd solution_matrix(12, time_step_vector.size()); //Initilize matrix that will hold solutions
+	solution_matrix.setZero().col(0) = initial_vector;
+
+	///////////////////////////////////////////////// End of initializing variables ///////////////////////////////////////////////////////////////
+
+
+
+
+	/////////////////////////////////// Read in the gravity and atmosphere data and we'll store it in a dictionary ///////////////////////////////
+
+	std::string filePath_altitude = "gravity_atm_data_alt_m.csv"; //m
+	std::string filePath_c_mps = "gravity_atm_data_c_mps.csv"; //mps
+	std::string filePath_gravity = "gravity_atm_data_g_mps2.csv"; //mps2
+	std::string filePath_air_density = "gravity_atm_data_rho_kgpm3.csv"; //kgpm3
+	std::ifstream alt_m;
+
+	alt_m.open(filePath_altitude);
+
+	if (alt_m.fail()) {
+		std::cout << "Failed to open file" << std::endl;
+	}
+
+
+	std::vector<double> altitude_vector = readNumericCSVColumn(filePath_altitude);
+	std::vector<double> c_mps_vec = readNumericCSVColumn(filePath_c_mps);
+	std::vector<double> gravity_vector = readNumericCSVColumn(filePath_gravity);
+	std::vector<double> air_density_vector = readNumericCSVColumn(filePath_air_density);
+	//////////// end of reading data for atmosphere ////////////////
+
+
+	/// Store atmosphere data in dictionary
+	std::map<std::string, std::vector<double>> atmosphere_map;
+	atmosphere_map["alt_m"] = altitude_vector;
+	atmosphere_map["c_mps"] = c_mps_vec;
+	atmosphere_map["g_mps2"] = gravity_vector;
+	atmosphere_map["rho_kgpm3"] = air_density_vector;
+	
+	//////////////////////////////////// End of gravity model extraction ////////////////////////////////////////////////////////
+
+
+
+
+	////////////////////////////////////// Vehicles/Objects to simulate ////////////////////////////////////////////////////////
+
+	std::map<std::string, double> vehicle_map = NASA_Atmos01_Sphere();
+	std::cout << vehicle_map["Vterm"] << std::endl;
+
+	////////////////////////////////////// End of vehicle selection ///////////////////////////////////////////////////////////
+
+
+
+
+	////////////////////////////////////// Run simulation ////////////////////////////////////////////////////////////////////
+
+	//Eigen::MatrixXd resultMatrix = ForwardEuler(time_step_vector, solution_matrix, vehicle_map, step, atmosphere_map);
+	Eigen::MatrixXd resultMatrix = FourOrderRungeKutta(time_step_vector, solution_matrix, vehicle_map, step, atmosphere_map);
+	//Eigen::MatrixXd resultMatrix = AdamsBashforth2(time_step_vector, solution_matrix, vehicle_map, step, atmosphere_map);
+
+	///////////////////////////////////// End of simulation /////////////////////////////////////////////////////////////////
+
+	
+
+
+	///////////////////////////////////// Get Altitude, Speed of Sound, Density, Translational Velocity, Mach Number //////////////////////////////////////
+
+	//Altitude
+	std::vector<double> Altitude(time_step_vector.size());
+	std::vector<double> InterpSpeedOfSound(time_step_vector.size());
+	std::vector<double> AirDensity(time_step_vector.size());
+	std::vector<double> TranslationalVelocity(time_step_vector.size());
+	std::vector<double> Mach(time_step_vector.size());
+
+	for (int i = 0; i < time_step_vector.size(); i++)
+	{
+		Altitude[i] = -resultMatrix(11, i);
+		InterpSpeedOfSound[i] = linearInterpolation(altitude_vector, c_mps_vec, Altitude[i]);
+		AirDensity[i] = linearInterpolation(altitude_vector, air_density_vector, Altitude[i]);
+		TranslationalVelocity[i] = sqrt(resultMatrix(0, i) * resultMatrix(0, i) + resultMatrix(1, i) * resultMatrix(1, i) + resultMatrix(2, i) * resultMatrix(2, i));
+		Mach[i] = TranslationalVelocity[i] / InterpSpeedOfSound[i];
+	}
+
+
+	std::string alt{ "altitude" };
+	printVector(Altitude, alt);
+
+
+
+	//Pitch angle
+	for (int i = 0; i < time_step_vector.size(); i++) {
+		std::cout << 180 / pi * resultMatrix(7, i) << std::endl;
+	}
+
+
+
+	//Pitch rate
+	for (int i = 0; i < time_step_vector.size(); i++) {
+		std::cout << 180 / pi * resultMatrix(4, i) << std::endl;
+	}
+
+
+	//////////////////////////////////////////////////////////////////////////////////
+
+
+
+	//Write each row of the solution matrix to a file to be plotted in MATLAB and Python
+
+
+	 ////////////////////// Write solution matrix to CSV file //////////////////////
+	std::ofstream outputFile("solution.csv");
+	if (outputFile.is_open()) {
+		outputFile << std::fixed << std::setprecision(10); // Set precision for output
+
+		// Write header row (optional, but helpful)
+		outputFile << "u_mps,v_mps,w_mps,p_rps,q_rps,r_rps,phi_rad,theta_rad,psi_rad,p1_n_m,p2_n_m,p3_n_m\n";
+
+		// Write each row of the solution matrix to the CSV file
+		for (int i = 0; i < resultMatrix.cols(); ++i) {
+			for (int j = 0; j < resultMatrix.rows(); ++j) {
+				outputFile << resultMatrix(j, i);
+				if (j < resultMatrix.rows() - 1) {
+					outputFile << ","; // Add comma as separator
+				}
+			}
+			outputFile << "\n"; // Add newline after each row
+		}
+		outputFile.close();
+		std::cout << "Solution matrix written to solution.csv" << std::endl;
+	}
+	else {
+		std::cerr << "Unable to open file for writing: solution.csv" << std::endl;
+		return 1;
+	}
+
+}
