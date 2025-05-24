@@ -157,9 +157,7 @@ Eigen::VectorXd TwelveDofSimulation(double time, Eigen::VectorXd state_vector_at
 
 	
 	dx[0] = 1 / m * Fx_b + gx_b - w * q + v * r; //x-axis velocity eq
-
 	dx[1] = 1 / m * Fy_b + gy_b - u * r + w * p; //y-axis velocity
-
 	dx[2] = 1 / m * Fz_b + gz_b - v * p + u * q; //z-axis velocity
 
 	//Roll eq
@@ -172,14 +170,10 @@ Eigen::VectorXd TwelveDofSimulation(double time, Eigen::VectorXd state_vector_at
 	dx[5] = ((Jxx_b * (Jxx_b - Jyy_b) + Jxz_b * Jxz_b) * p * q - Jxz_b * (Jxx_b - Jyy_b + Jzz_b) * q * r + Jxz_b * l_b + Jxz_b * n_b) / denominator;
 
 	//Kinematic equations
-	dx[6] = p + sin(phi) * tan(theta) * q + cos(phi) * tan(theta) * r;
-	dx[7] = cos(phi) * q - sin(phi) * r;
-	dx[8] = sin(phi) / cos(theta) * q + cos(phi) / cos(theta) * r;
-
-	//Eigen::VectorXd EulerKinEq = EulersKinematicalEq(p, q, r, phi, theta, psi);
-	//dx[6] = EulerKinEq[0];
-	//dx[7] = EulerKinEq[1];
-	//dx[8] = EulerKinEq[2];
+	Eigen::VectorXd EulerKinEq = EulersKinematicalEq(p, q, r, phi, theta, psi);
+	dx[6] = EulerKinEq[0];
+	dx[7] = EulerKinEq[1];
+	dx[8] = EulerKinEq[2];
 
 
 	//Eigen::VectorXd QuatKinEqs = QuaternionKinematicalEqs(phi, theta, psi, p, q, r);
@@ -254,7 +248,7 @@ int main() {
 
 
 
-	/////////////////////////////////// Read in the gravity and atmosphere data and we'll store it in a dictionary ///////////////////////////////
+	/////////////////////////////////// USSA 1976 - Read in the gravity and atmosphere data and we'll store it in a dictionary ///////////////////////////////
 
 	std::string filePath_altitude = "gravity_atm_data_alt_m.csv"; //m
 	std::string filePath_c_mps = "gravity_atm_data_c_mps.csv"; //mps
@@ -306,17 +300,50 @@ int main() {
 
 	///////////////////////////////////// End of simulation /////////////////////////////////////////////////////////////////
 
-	
 
 
-	///////////////////////////////////// Get Altitude, Speed of Sound, Density, Translational Velocity, Mach Number //////////////////////////////////////
-
-	//Altitude
+	///////////////////////////////////// Post processing of results ////////////////////////////////////////////////////////
+	//Vectors to store air data specs
 	std::vector<double> Altitude(time_step_vector.size());
 	std::vector<double> InterpSpeedOfSound(time_step_vector.size());
 	std::vector<double> AirDensity(time_step_vector.size());
 	std::vector<double> TranslationalVelocity(time_step_vector.size());
 	std::vector<double> Mach(time_step_vector.size());
+
+	Eigen::VectorXd AngleOfAttack(time_step_vector.size()); //radians
+	Eigen::VectorXd AngleOfSideslip(time_step_vector.size()); //radians
+
+
+	//Cosine and sine values for Euler angles from main simulation
+	Eigen::VectorXd c_phi(time_step_vector.size());
+	Eigen::VectorXd c_theta(time_step_vector.size());
+	Eigen::VectorXd c_psi(time_step_vector.size());
+	Eigen::VectorXd s_phi(time_step_vector.size());
+	Eigen::VectorXd s_theta(time_step_vector.size());
+	Eigen::VectorXd s_psi(time_step_vector.size());
+
+
+	//Coordinate transformation vectors for body to NED frame - easier than having update a rotation matrix
+	Eigen::VectorXd body2NED_11(time_step_vector.size());
+	Eigen::VectorXd body2NED_12(time_step_vector.size());
+	Eigen::VectorXd body2NED_13(time_step_vector.size());
+	Eigen::VectorXd body2NED_21(time_step_vector.size());
+	Eigen::VectorXd body2NED_22(time_step_vector.size());
+	Eigen::VectorXd body2NED_23(time_step_vector.size());
+	Eigen::VectorXd body2NED_31(time_step_vector.size());
+	Eigen::VectorXd body2NED_32(time_step_vector.size());
+	Eigen::VectorXd body2NED_33(time_step_vector.size());
+
+	//u,v,w transformed to NED frame
+	Eigen::VectorXd u_NED(time_step_vector.size());
+	Eigen::VectorXd v_NED(time_step_vector.size());
+	Eigen::VectorXd w_NED(time_step_vector.size());
+
+	//phi, theta, psi in radians
+	Eigen::VectorXd phi_rad(time_step_vector.size());
+	Eigen::VectorXd theta_rad(time_step_vector.size());
+	Eigen::VectorXd psi_rad(time_step_vector.size());
+	
 
 	for (int i = 0; i < time_step_vector.size(); i++)
 	{
@@ -325,11 +352,60 @@ int main() {
 		AirDensity[i] = linearInterpolation(altitude_vector, air_density_vector, Altitude[i]);
 		TranslationalVelocity[i] = sqrt(resultMatrix(0, i) * resultMatrix(0, i) + resultMatrix(1, i) * resultMatrix(1, i) + resultMatrix(2, i) * resultMatrix(2, i));
 		Mach[i] = TranslationalVelocity[i] / InterpSpeedOfSound[i];
+
+		c_phi[i] = cos(resultMatrix(6, i));
+		c_theta[i] = cos(resultMatrix(7, i));
+		c_psi[i] = cos(resultMatrix(8, i));
+		s_phi[i] = sin(resultMatrix(6, i));
+		s_theta[i] = sin(resultMatrix(7, i));
+		s_psi[i] = sin(resultMatrix(8, i));
+
+		body2NED_11[i] = c_theta[i] * c_psi[i];
+		body2NED_12[i] = c_theta[i] * s_phi[i];
+		body2NED_13[i] = -s_theta[i];
+		body2NED_21[i] = c_psi[i] * s_theta[i] * s_phi[i] - c_phi[i] * s_psi[i];
+		body2NED_22[i] = c_phi[i] * c_psi[i] + s_theta[i] * s_phi[i] * s_psi[i];
+		body2NED_23[i] = c_theta[i] * s_phi[i];
+		body2NED_31[i] = c_phi[i] * c_psi[i] * s_theta[i] + s_phi[i] * s_psi[i];
+		body2NED_32[i] = c_phi[i] * s_theta[i] * s_psi[i] - c_psi[i] * s_phi[i];
+		body2NED_33[i] = c_theta[i] * c_phi[i];
+
+		u_NED[i] = body2NED_11[i] * resultMatrix(0, i) + body2NED_12[i] * resultMatrix(1, i) + body2NED_13[i] * resultMatrix(2, i);
+		v_NED[i] = body2NED_21[i] * resultMatrix(0, i) + body2NED_22[i] * resultMatrix(1, i) + body2NED_23[i] * resultMatrix(2, i);
+		w_NED[i] = body2NED_31[i] * resultMatrix(0, i) + body2NED_32[i] * resultMatrix(1, i) + body2NED_33[i] * resultMatrix(2, i);
+
 	}
 
 
-	std::string alt{ "altitude" };
-	printVector(Altitude, alt);
+	//Angle of attack
+	for (int i = 0; i < time_step_vector.size(); i++)
+	{
+		double temp; //avoid division by zero
+
+		if (resultMatrix(0,i) == 0) {
+			temp = 0.0;
+		}
+		else {
+			temp = resultMatrix(2,i)/resultMatrix(0,i);
+		}
+		AngleOfAttack[i] = atan(temp);
+	}
+
+
+	//Angle of sideslip
+	for (int i = 0; i < time_step_vector.size(); i++)
+	{
+		double temp; //avoid division by zero
+
+		if (TranslationalVelocity[i] == 0) {
+			temp = 0.0;
+		}
+		else {
+			temp = resultMatrix(1,i) / TranslationalVelocity[i];
+		}
+
+		AngleOfSideslip[i] = asin(temp);
+	}
 
 
 
@@ -349,8 +425,6 @@ int main() {
 	//////////////////////////////////////////////////////////////////////////////////
 
 
-
-	//Write each row of the solution matrix to a file to be plotted in MATLAB and Python
 
 
 	 ////////////////////// Write solution matrix to CSV file //////////////////////

@@ -73,7 +73,7 @@ private:
 
 	const double in2m = 0.0254; //inches to meter conversion
 	std::string _name{};
-	double _rho{}; //desnity
+	double _rho{}; //density
 	double _radius_in{};
 	double _radius_m{};
 	double _coef_drag{};
