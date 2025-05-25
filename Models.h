@@ -66,34 +66,11 @@ std::map<std::string, double> NASA_Atmos01_Sphere() {
 	return _vehicle_map;
 }
 
-std::map<std::string, double> NASA_Atmos02_Sphere() {
+std::map<std::string, double> NASA_Atmos02_Brick() {
 
 	double pi = 3.14159;
 
 	double in2m = 0.0254;
-
-	double rho_NASA_Sphere = 7868.36;
-
-	double r_sphere_in = 3.0;
-	double r_sphere_m = r_sphere_in * in2m;
-
-	double b_m = r_sphere_m; //ref wing span
-
-	double c_m = r_sphere_m; //ref wing chord
-
-	double CD_approx = 0.5; //Approximate coef of drag for subsonic regimes
-
-	double Clp = 0.0;
-
-	double Clr = 0.0;
-
-	double Cmq = 0.0;
-
-	double Cnp = 0.0;
-
-	double Cnr = 0.0;
-
-	long double vol_sphere = (4.0 / 3.0) * pi * pow(r_sphere_m, 3);
 
 	double slug2kg = 14.5939;
 	double kg2slug = 1 / slug2kg;
@@ -148,8 +125,8 @@ std::map<std::string, double> NASA_Atmos02_Sphere() {
 	_vehicle_map["Cmq"] = Cmq;
 	_vehicle_map["Cnp"] = Cnp;
 	_vehicle_map["Cnr"] = Cnr;
-	_vehicle_map["b_m"] = b_m;
-	_vehicle_map["c_m"] = c_m;
+	_vehicle_map["b_m"] = ref_wing_span;
+	_vehicle_map["c_m"] = ref_wing_chord;
 
 	return _vehicle_map;
 }

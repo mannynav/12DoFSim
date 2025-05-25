@@ -139,10 +139,26 @@ Eigen::VectorXd TwelveDofSimulation(double time, Eigen::VectorXd state_vector_at
 	double side = 0.0;
 	double lift = 0.0;
 
+	double s_alpha_rad = sin(alpha_rad);
+	double c_alpha_rad = cos(alpha_rad);
+	double s_beta_rad = sin(beta_rad);
+	double c_beta_rad = cos(beta_rad);
+
+
+	//Components of DCM for body to stability axis
+	double w2b_11 = c_alpha * c_beta;
+	double w2b_12 = -c_alpha * s_beta;
+	double w2b_13 = -s_alpha;
+	double w2b_21 = s_beta;
+	double w2b_22 = c_beta;
+	double w2b_23 = 0.0;
+	double w2b_31 = s_alpha * c_beta;
+	double w2b_32 = -s_alpha * s_beta;
+	double w2b_33 = c_alpha;
 
 	//External forces
 	double Fx_b = -(c_alpha * c_beta * drag - c_alpha * s_beta * side - s_alpha * lift);
-	double Fy_b = -(s_beta * drag + c_beta * side);
+	double Fy_b = -(s_beta * drag + c_beta * side + 0.0*lift);
 	double Fz_b = -(s_alpha * c_beta * drag - s_alpha * s_beta * side + c_alpha * lift);
 
 	//External moments
@@ -168,7 +184,7 @@ Eigen::VectorXd TwelveDofSimulation(double time, Eigen::VectorXd state_vector_at
 	dx[4] = ((Jzz_b - Jxx_b) * p * r - Jxz_b * (p * p - r * r) + m_b) / Jyy_b;
 
 	//Yaw eq
-	dx[5] = ((Jxx_b * (Jxx_b - Jyy_b) + Jxz_b * Jxz_b) * p * q - Jxz_b * (Jxx_b - Jyy_b + Jzz_b) * q * r + Jxz_b * l_b + Jxz_b * n_b) / denominator;
+	dx[5] = ((Jxx_b * (Jxx_b - Jyy_b) + Jxz_b * Jxz_b) * p * q - Jxz_b * (Jxx_b - Jyy_b + Jzz_b) * q * r + Jxz_b * l_b + Jxx_b * n_b) / denominator;
 
 	//Kinematic equations
 	Eigen::VectorXd EulerKinEq = EulersKinematicalEq(p, q, r, phi, theta, psi);
@@ -286,7 +302,7 @@ int main() {
 	////////////////////////////////////// Vehicles/Objects to simulate ////////////////////////////////////////////////////////
 
 	//std::map<std::string, double> vehicle_map = NASA_Atmos01_Sphere();
-	std::map<std::string, double> vehicle_map = NASA_Atmos02_Sphere();
+	std::map<std::string, double> vehicle_map = NASA_Atmos02_Brick();
 	std::cout << vehicle_map["Vterm"] << std::endl;
 
 	////////////////////////////////////// End of vehicle selection ///////////////////////////////////////////////////////////
@@ -389,6 +405,7 @@ int main() {
 		body2NED_32[i] = c_phi[i] * s_theta[i] * s_psi[i] - c_psi[i] * s_phi[i];
 		body2NED_33[i] = c_theta[i] * c_phi[i];
 
+		std::cout << body2NED_12[i] << std::endl;
 		u_NED[i] = body2NED_11[i] * resultMatrix(0, i) + body2NED_12[i] * resultMatrix(1, i) + body2NED_13[i] * resultMatrix(2, i);
 		v_NED[i] = body2NED_21[i] * resultMatrix(0, i) + body2NED_22[i] * resultMatrix(1, i) + body2NED_23[i] * resultMatrix(2, i);
 		w_NED[i] = body2NED_31[i] * resultMatrix(0, i) + body2NED_32[i] * resultMatrix(1, i) + body2NED_33[i] * resultMatrix(2, i);
