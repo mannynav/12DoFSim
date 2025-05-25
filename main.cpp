@@ -55,7 +55,7 @@ Eigen::VectorXd TwelveDofSimulation(double time, Eigen::VectorXd state_vector_at
 
 
 	//Get reference dimensions
-	double Aref = vehicle_model["Aref"];
+	double Aref = vehicle_model["Area_ref"];
 	double b_m = vehicle_model["b_m"];
 	double c_m = vehicle_model["c_m"];
 
@@ -160,6 +160,7 @@ Eigen::VectorXd TwelveDofSimulation(double time, Eigen::VectorXd state_vector_at
 	dx[1] = 1 / m * Fy_b + gy_b - u * r + w * p; //y-axis velocity
 	dx[2] = 1 / m * Fz_b + gz_b - v * p + u * q; //z-axis velocity
 
+
 	//Roll eq
 	dx[3] = (Jxz_b * (Jxx_b - Jyy_b + Jzz_b) * p * q - (Jzz_b * (Jzz_b - Jyy_b) + Jxz_b * Jxz_b) * q * r + Jzz_b * l_b + Jxz_b * n_b) / denominator;
 
@@ -222,11 +223,11 @@ int main() {
 	double u = 0.0000000001;
 	double v = 0.0;
 	double w = 0.0;
-	double p = 0*degrees2radians;
-	double q = 0 * degrees2radians;
-	double r = 0 * degrees2radians;
+	double p = 10*degrees2radians;
+	double q = 20 * degrees2radians;
+	double r = 30 * degrees2radians;
 	double phi = 0 * pi / 180.0;
-	double theta = -180*degrees2radians;
+	double theta = 0*degrees2radians;
 	double psi = 0 * degrees2radians;
 	double p10_n_m = 0;
 	double p20_n_m = 0;
@@ -284,7 +285,8 @@ int main() {
 
 	////////////////////////////////////// Vehicles/Objects to simulate ////////////////////////////////////////////////////////
 
-	std::map<std::string, double> vehicle_map = NASA_Atmos01_Sphere();
+	//std::map<std::string, double> vehicle_map = NASA_Atmos01_Sphere();
+	std::map<std::string, double> vehicle_map = NASA_Atmos02_Sphere();
 	std::cout << vehicle_map["Vterm"] << std::endl;
 
 	////////////////////////////////////// End of vehicle selection ///////////////////////////////////////////////////////////
@@ -303,12 +305,14 @@ int main() {
 
 
 	///////////////////////////////////// Post processing of results ////////////////////////////////////////////////////////
+	
 	//Vectors to store air data specs
-	std::vector<double> Altitude(time_step_vector.size());
-	std::vector<double> InterpSpeedOfSound(time_step_vector.size());
-	std::vector<double> AirDensity(time_step_vector.size());
-	std::vector<double> TranslationalVelocity(time_step_vector.size());
-	std::vector<double> Mach(time_step_vector.size());
+	Eigen::VectorXd Altitude(time_step_vector.size());
+	Eigen::VectorXd InterpSpeedOfSound(time_step_vector.size());
+	Eigen::VectorXd AirDensity(time_step_vector.size());
+	Eigen::VectorXd TranslationalVelocity(time_step_vector.size());
+	Eigen::VectorXd Mach(time_step_vector.size());
+
 
 	Eigen::VectorXd AngleOfAttack(time_step_vector.size()); //radians
 	Eigen::VectorXd AngleOfSideslip(time_step_vector.size()); //radians
@@ -334,15 +338,30 @@ int main() {
 	Eigen::VectorXd body2NED_32(time_step_vector.size());
 	Eigen::VectorXd body2NED_33(time_step_vector.size());
 
+
 	//u,v,w transformed to NED frame
 	Eigen::VectorXd u_NED(time_step_vector.size());
 	Eigen::VectorXd v_NED(time_step_vector.size());
 	Eigen::VectorXd w_NED(time_step_vector.size());
 
+
 	//phi, theta, psi in radians
 	Eigen::VectorXd phi_rad(time_step_vector.size());
 	Eigen::VectorXd theta_rad(time_step_vector.size());
 	Eigen::VectorXd psi_rad(time_step_vector.size());
+
+
+	//phi, theta, psi in degrees
+	Eigen::VectorXd phi_deg(time_step_vector.size());
+	Eigen::VectorXd theta_deg(time_step_vector.size());
+	Eigen::VectorXd psi_deg(time_step_vector.size());
+
+
+	Eigen::VectorXd roll_rate(time_step_vector.size());
+	Eigen::VectorXd pitch_rate(time_step_vector.size());
+	Eigen::VectorXd yaw_rate(time_step_vector.size());
+
+
 	
 
 	for (int i = 0; i < time_step_vector.size(); i++)
@@ -373,6 +392,18 @@ int main() {
 		u_NED[i] = body2NED_11[i] * resultMatrix(0, i) + body2NED_12[i] * resultMatrix(1, i) + body2NED_13[i] * resultMatrix(2, i);
 		v_NED[i] = body2NED_21[i] * resultMatrix(0, i) + body2NED_22[i] * resultMatrix(1, i) + body2NED_23[i] * resultMatrix(2, i);
 		w_NED[i] = body2NED_31[i] * resultMatrix(0, i) + body2NED_32[i] * resultMatrix(1, i) + body2NED_33[i] * resultMatrix(2, i);
+
+		phi_rad[i] = resultMatrix(6, i);
+		theta_rad[i] = resultMatrix(7, i);
+		psi_rad[i] = resultMatrix(8, i);
+
+		phi_deg[i] = (180 / 3.14) * resultMatrix(6, i);
+		theta_deg[i] = (180 / 3.14) * resultMatrix(7, i);
+		psi_deg[i] = (180 / 3.14) * resultMatrix(8, i);
+
+		roll_rate[i] = resultMatrix(3, i);
+		pitch_rate[i] = resultMatrix(4, i);
+		yaw_rate[i] = resultMatrix(5, i);
 
 	}
 
@@ -409,20 +440,55 @@ int main() {
 
 
 
-	//Pitch angle
+
+	//Vector for plotting purposes
+	Eigen::VectorXd time_vector(time_step_vector.size());
 	for (int i = 0; i < time_step_vector.size(); i++) {
-		std::cout << 180 / pi * resultMatrix(7, i) << std::endl;
+		time_vector[i] = time_step_vector[i];
 	}
 
 
 
-	//Pitch rate
-	for (int i = 0; i < time_step_vector.size(); i++) {
-		std::cout << 180 / pi * resultMatrix(4, i) << std::endl;
-	}
+	Eigen::MatrixXd postProcessMatrix(29, time_step_vector.size());
+	postProcessMatrix.row(0) = time_vector;
+	postProcessMatrix.row(1) = Altitude.transpose(); //m
+	postProcessMatrix.row(2) = 3.28*Altitude.transpose(); // ft - mean sea level
+
+	postProcessMatrix.row(3) = 3.28 * InterpSpeedOfSound.transpose(); // ft/sec
+	postProcessMatrix.row(4) = 0.001941811*AirDensity.transpose(); // slug/ft3
+	postProcessMatrix.row(5) = 1.94384*TranslationalVelocity.transpose(); // nmi_h
+	postProcessMatrix.row(6) = Mach.transpose();
+
+	postProcessMatrix.row(7) = AngleOfAttack.transpose(); // radians
+	postProcessMatrix.row(8) = (180/3.14)*AngleOfAttack.transpose(); // degrees
+
+	postProcessMatrix.row(9) = AngleOfSideslip.transpose(); // radians
+	postProcessMatrix.row(10) = (180/3.14)*AngleOfSideslip.transpose(); // degrees
+
+	postProcessMatrix.row(11) = u_NED.transpose(); // m/sec
+	postProcessMatrix.row(12) = v_NED.transpose(); // m/sec
+	postProcessMatrix.row(13) = w_NED.transpose(); // m/sec
+	postProcessMatrix.row(14) = 3.28*u_NED.transpose(); // ft/sec
+	postProcessMatrix.row(15) = 3.28*v_NED.transpose(); // ft/sec
+	postProcessMatrix.row(16) = 3.28*w_NED.transpose(); // ft/sec
+
+	postProcessMatrix.row(17) = phi_rad.transpose(); // rad
+	postProcessMatrix.row(18) = theta_rad.transpose();
+	postProcessMatrix.row(19) = psi_rad.transpose();
+	postProcessMatrix.row(20) = phi_deg.transpose(); // deg
+	postProcessMatrix.row(21) = theta_deg.transpose();
+	postProcessMatrix.row(22) = psi_deg.transpose();
+	
+	postProcessMatrix.row(23) = roll_rate.transpose(); // rad/sec
+	postProcessMatrix.row(24) = pitch_rate.transpose();
+	postProcessMatrix.row(25) = yaw_rate.transpose();
+
+	postProcessMatrix.row(26) = (180/3.14)*roll_rate.transpose(); // deg/sec
+	postProcessMatrix.row(27) = (180/3.14)*pitch_rate.transpose();
+	postProcessMatrix.row(28) = (180/3.14)*yaw_rate.transpose(); 
 
 
-	//////////////////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////// end post processing ////////////////////////////////////////////
 
 
 
@@ -452,5 +518,35 @@ int main() {
 		std::cerr << "Unable to open file for writing: solution.csv" << std::endl;
 		return 1;
 	}
+
+
+
+	std::ofstream outputPostProcessFile("postProcessSolution.csv");
+	if (outputPostProcessFile.is_open()) {
+		outputPostProcessFile << std::fixed << std::setprecision(10); // Set precision for output
+
+		// Write header row (optional, but helpful)
+		outputPostProcessFile << "Time, Altitude - m, Altitude - ft, SpeedofSound - ft/sec, AirDensity - slug/ft3,TransVel - ft/sec,Mach, AoA - rad, AoA - deg, AoS - rad, AoS - deg, u_NED, v_NED, w_NED, u_NED - ft/sec, v_NED - ft/sec, w_NED - ft/sec, phi_rad, theta_rad, psi_rad, phi_deg, theta_deg, psi_rad, roll_rate, pitch_rate, yaw_rate, roll_rate - deg, pitch_rate - deg, yaw_rate - deg \n";
+
+		// Write each row of the solution matrix to the CSV file
+		for (int i = 0; i < postProcessMatrix.cols(); ++i) {
+			for (int j = 0; j < postProcessMatrix.rows(); ++j) {
+				outputPostProcessFile << postProcessMatrix(j, i);
+				if (j < postProcessMatrix.rows() - 1) {
+					outputPostProcessFile << ","; // Add comma as separator
+				}
+			}
+			outputPostProcessFile << "\n"; // Add newline after each row
+		}
+		outputPostProcessFile.close();
+		std::cout << "Post process matrix written to postProcessSolution.csv" << std::endl;
+	}
+	else {
+		std::cerr << "Unable to open file for writing: postProcessSolution.csv" << std::endl;
+		return 1;
+	}
+
+
+
 
 }
