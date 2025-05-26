@@ -396,14 +396,14 @@ int main() {
 		s_psi[i] = sin(resultMatrix(8, i));
 
 		body2NED_11[i] = c_theta[i] * c_psi[i];
-		body2NED_12[i] = c_theta[i] * s_phi[i];
-		body2NED_13[i] = -s_theta[i];
-		body2NED_21[i] = c_psi[i] * s_theta[i] * s_phi[i] - c_phi[i] * s_psi[i];
-		body2NED_22[i] = c_phi[i] * c_psi[i] + s_theta[i] * s_phi[i] * s_psi[i];
-		body2NED_23[i] = c_theta[i] * s_phi[i];
-		body2NED_31[i] = c_phi[i] * c_psi[i] * s_theta[i] + s_phi[i] * s_psi[i];
-		body2NED_32[i] = c_phi[i] * s_theta[i] * s_psi[i] - c_psi[i] * s_phi[i];
-		body2NED_33[i] = c_theta[i] * c_phi[i];
+		body2NED_12[i] = -c_phi[i] * s_psi[i] + s_phi[i] * s_theta[i] * c_psi[i];
+		body2NED_13[i] = s_phi[i] * s_psi[i] + c_phi[i] * s_theta[i] * c_psi[i];
+		body2NED_21[i] = c_theta[i] * s_psi[i];
+		body2NED_22[i] = c_phi[i] * c_psi[i] + s_phi[i] * s_theta[i]*s_psi[i];
+		body2NED_23[i] = -s_phi[i] * c_psi[i] + c_phi[i] * s_theta[i] * s_psi[i];
+		body2NED_31[i] = -s_theta[i];
+		body2NED_32[i] = s_phi[i] * c_theta[i];
+		body2NED_33[i] = c_phi[i] * c_theta[i];
 
 		std::cout << body2NED_12[i] << std::endl;
 		u_NED[i] = body2NED_11[i] * resultMatrix(0, i) + body2NED_12[i] * resultMatrix(1, i) + body2NED_13[i] * resultMatrix(2, i);
