@@ -156,6 +156,8 @@ Eigen::VectorXd TwelveDofSimulation(double time, Eigen::VectorXd state_vector_at
 	double w2b_32 = -s_alpha * s_beta;
 	double w2b_33 = c_alpha;
 
+	
+
 	//External forces
 	double Fx_b = -(c_alpha * c_beta * drag - c_alpha * s_beta * side - s_alpha * lift);
 	double Fy_b = -(s_beta * drag + c_beta * side + 0.0*lift);
@@ -166,6 +168,12 @@ Eigen::VectorXd TwelveDofSimulation(double time, Eigen::VectorXd state_vector_at
 	double m_b = Cmq * q * c_m / (2.0 * translation_velocity); //m_b is 0 if Cmq or q_b or c_m = 0.
 	double n_b = Cnp * p * b_m / (2.0 * translation_velocity) + Cnr * r * b_m / (2.0 * translation_velocity); //n_b is 0 if Cnp or p_b or b_m = 0.
 
+	////External moments - dimensionalized
+	l_b = (Clp * p * b_m / (2.0 * translation_velocity) + Clr * r * b_m / (2.0 * translation_velocity))*qbar*Aref*b_m; //l_b is zero if b_m = 0 or Clp or Clr are 0.
+	m_b = (Cmq * q * c_m / (2.0 * translation_velocity))*qbar*Aref*c_m; //m_b is 0 if Cmq or q_b or c_m = 0.
+	n_b = (Cnp * p * b_m / (2.0 * translation_velocity) + Cnr * r * b_m / (2.0 * translation_velocity))*qbar*Aref*b_m; //n_b is 0 if Cnp or p_b or b_m = 0.
+
+	//std::cout << l_b << std::endl;
 
 	//Denominator for roll and yaw rate equations
 	double denominator = Jxx_b * Jzz_b - Jxz_b * Jxz_b;
@@ -177,13 +185,13 @@ Eigen::VectorXd TwelveDofSimulation(double time, Eigen::VectorXd state_vector_at
 	dx[2] = 1 / m * Fz_b + gz_b - v * p + u * q; //z-axis velocity
 
 
-	//Roll eq
+	//Roll rate eq
 	dx[3] = (Jxz_b * (Jxx_b - Jyy_b + Jzz_b) * p * q - (Jzz_b * (Jzz_b - Jyy_b) + Jxz_b * Jxz_b) * q * r + Jzz_b * l_b + Jxz_b * n_b) / denominator;
 
-	//Pitch eq
+	//Pitch rate eq
 	dx[4] = ((Jzz_b - Jxx_b) * p * r - Jxz_b * (p * p - r * r) + m_b) / Jyy_b;
 
-	//Yaw eq
+	//Yaw rate eq
 	dx[5] = ((Jxx_b * (Jxx_b - Jyy_b) + Jxz_b * Jxz_b) * p * q - Jxz_b * (Jxx_b - Jyy_b + Jzz_b) * q * r + Jxz_b * l_b + Jxx_b * n_b) / denominator;
 
 	//Kinematic equations
@@ -301,9 +309,9 @@ int main() {
 
 	////////////////////////////////////// Vehicles/Objects to simulate ////////////////////////////////////////////////////////
 
-	//std::map<std::string, double> vehicle_map = NASA_Atmos01_Sphere();
-	std::map<std::string, double> vehicle_map = NASA_Atmos02_Brick();
-	std::cout << vehicle_map["Vterm"] << std::endl;
+	//std::map<std::string, double> vehicle_map = NASA_Atmos01_Sphere(); //check case 1
+	//std::map<std::string, double> vehicle_map = NASA_Atmos02_Brick(); //check case 2
+	std::map<std::string, double> vehicle_map = NASA_Atmos03_Brick(); //check case 3
 
 	////////////////////////////////////// End of vehicle selection ///////////////////////////////////////////////////////////
 
