@@ -405,18 +405,17 @@ int main() {
 		body2NED_32[i] = s_phi[i] * c_theta[i];
 		body2NED_33[i] = c_phi[i] * c_theta[i];
 
-		std::cout << body2NED_12[i] << std::endl;
 		u_NED[i] = body2NED_11[i] * resultMatrix(0, i) + body2NED_12[i] * resultMatrix(1, i) + body2NED_13[i] * resultMatrix(2, i);
 		v_NED[i] = body2NED_21[i] * resultMatrix(0, i) + body2NED_22[i] * resultMatrix(1, i) + body2NED_23[i] * resultMatrix(2, i);
 		w_NED[i] = body2NED_31[i] * resultMatrix(0, i) + body2NED_32[i] * resultMatrix(1, i) + body2NED_33[i] * resultMatrix(2, i);
 
-		phi_rad[i] = resultMatrix(6, i);
-		theta_rad[i] = resultMatrix(7, i);
-		psi_rad[i] = resultMatrix(8, i);
+		phi_rad[i] = atan2(body2NED_32[i], body2NED_33[i]);
+		theta_rad[i] = -asin(body2NED_31[i]);
+		psi_rad[i] = atan2(body2NED_21[i],body2NED_11[i]);
 
-		phi_deg[i] = (180 / 3.14) * resultMatrix(6, i);
-		theta_deg[i] = (180 / 3.14) * resultMatrix(7, i);
-		psi_deg[i] = (180 / 3.14) * resultMatrix(8, i);
+		phi_deg[i] = (180 / 3.14) * phi_rad[i];
+		theta_deg[i] = (180 / 3.14) * theta_rad[i];
+		psi_deg[i] = (180 / 3.14) * psi_rad[i];
 
 		roll_rate[i] = resultMatrix(3, i);
 		pitch_rate[i] = resultMatrix(4, i);
@@ -543,7 +542,7 @@ int main() {
 		outputPostProcessFile << std::fixed << std::setprecision(10); // Set precision for output
 
 		// Write header row (optional, but helpful)
-		outputPostProcessFile << "Time, Altitude - m, Altitude - ft, SpeedofSound - ft/sec, AirDensity - slug/ft3,TransVel - ft/sec,Mach, AoA - rad, AoA - deg, AoS - rad, AoS - deg, u_NED, v_NED, w_NED, u_NED - ft/sec, v_NED - ft/sec, w_NED - ft/sec, phi_rad, theta_rad, psi_rad, phi_deg, theta_deg, psi_rad, roll_rate, pitch_rate, yaw_rate, roll_rate - deg, pitch_rate - deg, yaw_rate - deg \n";
+		outputPostProcessFile << "Time, Altitude - m, Altitude - ft, SpeedofSound - ft/sec, AirDensity - slug/ft3,TransVel - ft/sec,Mach, AoA - rad, AoA - deg, AoS - rad, AoS - deg, u_NED, v_NED, w_NED, u_NED - ft/sec, v_NED - ft/sec, w_NED - ft/sec, phi_rad, theta_rad, psi_rad, phi_deg, theta_deg, psi_deg, roll_rate, pitch_rate, yaw_rate, roll_rate - deg, pitch_rate - deg, yaw_rate - deg \n";
 
 		// Write each row of the solution matrix to the CSV file
 		for (int i = 0; i < postProcessMatrix.cols(); ++i) {
