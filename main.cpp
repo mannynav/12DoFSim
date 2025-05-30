@@ -75,26 +75,22 @@ Eigen::VectorXd TwelveDofSimulation(double time, Eigen::VectorXd state_vector_at
 	/////////////// Data from US Standard Atmosphere //////////////
 
 	//values for rho
-	//double rho_interp = 1.20;
-	double rho_interp_2 = linearInterpolation(atmosphere_mod["alt_m"], atmosphere_mod["rho_kgpm3"], altitude);
-	//std::cout << "rho interp: " << rho_interp_2 << std::endl;
-	//double rho_interp = 1.225;   //later we will interpolate this
+	double rho = linearInterpolation(atmosphere_mod["alt_m"], atmosphere_mod["rho_kgpm3"], altitude);
+	
 
-	//values for c_mps
-	double c_interp = linearInterpolation(atmosphere_mod["alt_m"], atmosphere_mod["c_mps"], altitude);
-	//double c_interp = 340.2939; //later we will interpolate this
+	//values for c
+	double c = linearInterpolation(atmosphere_mod["alt_m"], atmosphere_mod["c_mps"], altitude);
 
 
 	//Air data calculation(Mach, AoA, AoS)
 	double translation_velocity = sqrt(u * u + v * v + w * w);
-	double qbar = 0.5 * rho_interp_2 * translation_velocity * translation_velocity;
-	double mach_number = translation_velocity / c_interp;
+	double qbar = 0.5 * rho * translation_velocity * translation_velocity;
+	double mach_number = translation_velocity / c;
 	double alpha_rad = atan2(w, u);
 	double beta_rad = asin(v / translation_velocity);
 
 
-
-
+	//Avoid division by 0 bugs
 	double w_over = 0.0000000001;
 	if (u == 0 && w == 0) {
 		w_over = 0.0;
@@ -122,9 +118,7 @@ Eigen::VectorXd TwelveDofSimulation(double time, Eigen::VectorXd state_vector_at
 	double c_beta = cos(beta);
 
 
-	//gravity will act normal to earht tangent CS
-	//double gs_n_mps2 = 9.81;
-	//double gs_n_mps2 = 9.80665;
+	//gravity will act normal to earth tangent CS
 	double gs_interp = linearInterpolation(atmosphere_mod["alt_m"], atmosphere_mod["g_mps2"], altitude);
 
 	//we need to transfrom gravity to body coordinate system
@@ -173,11 +167,8 @@ Eigen::VectorXd TwelveDofSimulation(double time, Eigen::VectorXd state_vector_at
 	m_b = (Cmq * q * c_m / (2.0 * translation_velocity))*qbar*Aref*c_m; //m_b is 0 if Cmq or q_b or c_m = 0.
 	n_b = (Cnp * p * b_m / (2.0 * translation_velocity) + Cnr * r * b_m / (2.0 * translation_velocity))*qbar*Aref*b_m; //n_b is 0 if Cnp or p_b or b_m = 0.
 
-	//std::cout << l_b << std::endl;
-
 	//Denominator for roll and yaw rate equations
 	double denominator = Jxx_b * Jzz_b - Jxz_b * Jxz_b;
-
 
 	
 	dx[0] = 1 / m * Fx_b + gx_b - w * q + v * r; //x-axis velocity eq
@@ -328,7 +319,7 @@ int main() {
 
 
 
-	///////////////////////////////////// Post processing of results ////////////////////////////////////////////////////////
+	///////////////////////////////////// Post processing of simulation results ////////////////////////////////////////////////////////
 	
 	//Vectors to store air data specs
 	Eigen::VectorXd Altitude(time_step_vector.size());
@@ -550,7 +541,7 @@ int main() {
 		outputPostProcessFile << std::fixed << std::setprecision(10); // Set precision for output
 
 		// Write header row (optional, but helpful)
-		outputPostProcessFile << "Time, Altitude - m, Altitude - ft, SpeedofSound - ft/sec, AirDensity - slug/ft3,TransVel - ft/sec,Mach, AoA - rad, AoA - deg, AoS - rad, AoS - deg, u_NED, v_NED, w_NED, u_NED - ft/sec, v_NED - ft/sec, w_NED - ft/sec, phi_rad, theta_rad, psi_rad, phi_deg, theta_deg, psi_deg, roll_rate, pitch_rate, yaw_rate, roll_rate - deg, pitch_rate - deg, yaw_rate - deg \n";
+		outputPostProcessFile << "Time, Altitude - m, Altitude - ft, SpeedofSound - ft/sec, AirDensity - slug/ft3,TransVel - ft/sec,Mach, AoA - rad, AoA - deg, AoS - rad, AoS - deg, u_NED, v_NED, w_NED, u_NED - ft/sec, v_NED - ft/sec, w_NED - ft/sec, phi_rad, theta_rad, psi_rad, phi_deg, theta_deg, psi_deg, roll_rate - rad/s, pitch_rate - rad/s, yaw_rate - rad/s, roll_rate - deg/s, pitch_rate - deg/s, yaw_rate - deg/s \n";
 
 		// Write each row of the solution matrix to the CSV file
 		for (int i = 0; i < postProcessMatrix.cols(); ++i) {
