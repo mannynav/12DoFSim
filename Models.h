@@ -65,7 +65,6 @@ std::map<std::string, double> NASA_Atmos01_Sphere() {
 
 	return _vehicle_map;
 }
-
 std::map<std::string, double> NASA_Atmos02_Brick() {
 
 	double pi = 3.14159;
@@ -130,7 +129,6 @@ std::map<std::string, double> NASA_Atmos02_Brick() {
 
 	return _vehicle_map;
 }
-
 std::map<std::string, double> NASA_Atmos03_Brick() {
 
 	double pi = 3.14159;
@@ -195,6 +193,81 @@ std::map<std::string, double> NASA_Atmos03_Brick() {
 
 	return _vehicle_map;
 }
+
+
+//To be implemented
+std::map<std::string, double> F16() {
+
+
+	std::map<std::string, double> _vehicle_map{};
+
+	/*_vehicle_map["m_kg"] = mass_kg;
+	_vehicle_map["Jxz_b"] = Jzx_kgm2;
+	_vehicle_map["Jxx_b"] = Jxx_kgm2;
+	_vehicle_map["Jyy_b"] = Jyy_kgm2;
+	_vehicle_map["Jzz_b"] = Jzz_kgm2;
+	_vehicle_map["Area_ref"] = A_ref;
+	_vehicle_map["Clp"] = Clp;
+	_vehicle_map["Clr"] = Clr;
+	_vehicle_map["Cmq"] = Cmq;
+	_vehicle_map["Cnp"] = Cnp;
+	_vehicle_map["Cnr"] = Cnr;
+	_vehicle_map["b_m"] = ref_wing_span;
+	_vehicle_map["c_m"] = ref_wing_chord;*/
+
+	return _vehicle_map;
+}
+
+
+class X15
+{
+
+public:
+
+	//Aerodynamic coefficients
+	//The drag, lift and sideforce coefficent build ups are from "Adaptive Control and the NASA X-15-3 Flight revisited".
+	//When these functions are called, they will be dimensionalized
+	double drag_coefficient(double CD_wing_body, double CD_delta_elevator, double CD_delta_speed_brake, double elevator_angle, double speed_brake_angle) {
+
+		double CD = CD_wing_body + CD_delta_elevator * elevator_angle + CD_delta_speed_brake * speed_brake_angle;
+		return CD;
+	}
+
+
+	//From Walker60, CL_dele is a function of AoA, dele and Mach
+	double lift_coefficient(double CL_wing_body, double CL_alpha, double CL_dele, double alpha, double elevator_angle) {
+
+		double CL = CL_wing_body + CL_alpha * alpha + CL_dele * (alpha + elevator_angle);
+		return CL;
+	}
+	double sideforce_coefficient(double CY_beta_sideslip, double CY_p_roll, double CY_r_yaw, double CY_beta_dot_accel, double CY_delta_aileron, double CY_delta_rudder, double beta, double p, double r, double beta_dot, double aileron_angle, double rudder_angle, double true_velocity, double b_m)
+	{
+		double CY = CY_beta_sideslip * beta + CY_p_roll * p * b_m / (2 * true_velocity) + CY_r_yaw * r * b_m / (2 * true_velocity) +
+			CY_beta_dot_accel * beta_dot * b_m / (2 * true_velocity) + CY_delta_aileron * aileron_angle + CY_delta_rudder * rudder_angle;
+		return CY;
+	}
+
+
+
+
+	//Moment coefficients - roll, pitch and yaw. Also from "Adaptive Control and the NASA X-15-3 Flight revisited"
+	double roll_coefficient() {
+
+	}
+
+	double pitch_coefficient() {
+
+	}
+
+	double yaw_coefficient() {
+
+	}
+
+
+
+private:
+
+};
 
 
 class Vehicle

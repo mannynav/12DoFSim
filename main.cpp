@@ -167,6 +167,9 @@ Eigen::VectorXd TwelveDofSimulation(double time, Eigen::VectorXd state_vector_at
 	m_b = (Cmq * q * c_m / (2.0 * translation_velocity))*qbar*Aref*c_m; //m_b is 0 if Cmq or q_b or c_m = 0.
 	n_b = (Cnp * p * b_m / (2.0 * translation_velocity) + Cnr * r * b_m / (2.0 * translation_velocity))*qbar*Aref*b_m; //n_b is 0 if Cnp or p_b or b_m = 0.
 
+
+
+
 	//Denominator for roll and yaw rate equations
 	double denominator = Jxx_b * Jzz_b - Jxz_b * Jxz_b;
 
@@ -264,7 +267,7 @@ int main() {
 
 
 
-	/////////////////////////////////// USSA 1976 - Read in the gravity and atmosphere data and we'll store it in a dictionary ///////////////////////////////
+	/////////////////////////////////// USSA 1976 - Read in the atmosphere data and we'll store it in a dictionary ///////////////////////////////
 
 	std::string filePath_altitude = "gravity_atm_data_alt_m.csv"; //m
 	std::string filePath_c_mps = "gravity_atm_data_c_mps.csv"; //mps
